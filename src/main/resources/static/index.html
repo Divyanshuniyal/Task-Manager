@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Task Management System</title>
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+    }
+
+    h1, h2 {
+        color: #333;
+    }
+
+    input, select, button {
+        margin: 5px;
+        padding: 6px;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    th, td {
+        border: 1px solid #aaa;
+        padding: 8px;
+        text-align: left;
+    }
+
+    #updates {
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        background: #f9f9f9;
+        height: 150px;
+        overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Task Management System</h1>
+
+<h2>Create New Task</h2>
+<form id="createTaskForm">
+  <input type="text" id="title" placeholder="Title" required>
+  <input type="text" id="description" placeholder="Description">
+  <input type="text" id="assignedUser" placeholder="Assigned User">
+  <select id="status">
+    <option value="Pending">Pending</option>
+    <option value="InProgress">In Progress</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <input type="date" id="dueDate">
+  <button type="submit">Add Task</button>
+</form>
+
+<h2>Search Tasks</h2>
+<input type="text" id="search" placeholder="Search by title, user or status">
+<button onclick="loadTasks()">Search</button>
+
+<h2>All Tasks</h2>
+<table>
+  <thead>
+  <tr>
+    <th>Title</th>
+    <th>Description</th>
+    <th>Status</th>
+    <th>Assigned User</th>
+    <th>Due Date</th>
+  </tr>
+  </thead>
+  <tbody id="taskList"></tbody>
+</table>
+
+<h2>Live WebSocket Updates</h2>
+<div id="updates"></div>
+
+<script>
+  const baseUrl = "http://localhost:8080/api/tasks";
+
+  document.getElementById("createTaskForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const task = {
+          title: document.getElementById("title").value,
+          description: document.getElementById("description").value,
+          assignedUser: document.getElementById("assignedUser").value,
+          status: document.getElementById("status").value,
+          dueDate: document.getElementById("dueDate").value
+      };
+      await fetch(baseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(task)
+      });
+      this.reset();
+      loadTasks();
+  });
+
+  async function loadTasks() {
+      const query = document.getElementById("search").value;
+      const response = await fetch(query ? `${baseUrl}/search?q=${query}` : baseUrl);
+      const tasks = await response.json();
+      const taskList = document.getElementById("taskList");
+      taskList.innerHTML = "";
+      tasks.forEach(task => {
+          const row = `<tr>
+              <td>${task.title}</td>
+              <td>${task.description}</td>
+              <td>${task.status}</td>
+              <td>${task.assignedUser}</td>
+              <td>${task.dueDate || ""}</td>
+          </tr>`;
+          taskList.innerHTML += row;
+      });
+  }
+
+  function connectWebSocket() {
+      const socket = new WebSocket("ws://localhost:8080/ws/tasks");
+      socket.onmessage = function (event) {
+          const msg = JSON.parse(event.data);
+          const updates = document.getElementById("updates");
+          updates.innerHTML = `<div><b>${msg.type}</b>: ${msg.message}</div>` + updates.innerHTML;
+          loadTasks();
+      };
+  }
+
+  loadTasks();
+  connectWebSocket();
+</script>
+
+</body>
+</html>
